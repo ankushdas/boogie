@@ -121,7 +121,7 @@ namespace Microsoft.Boogie
           : $"Wrapper_YieldToYield_NoninterferenceChecker_{layerNum}";
       wrapperYieldToYieldNoninterferenceCheckerProc = DeclHelper.Procedure(
         civlTypeChecker.AddNamePrefix(wrapperYieldToYieldNoninterferenceCheckerProcName),
-        wrapperNoninterferenceCheckerFormals, new List<Variable>(), new List<Requires>(), new List<Requires>(), new List<Ensures>(), new List<Measure>(), new List<IdentifierExpr>());
+        wrapperNoninterferenceCheckerFormals, new List<Variable>(), new List<Requires>(), new List<Requires>(), new List<Ensures>(), new List<MeasureCmd>(), new List<IdentifierExpr>());
       CivlUtil.AddInlineAttribute(wrapperYieldToYieldNoninterferenceCheckerProc);
       
       var wrapperGlobalNoninterferenceCheckerProcName =
@@ -130,7 +130,7 @@ namespace Microsoft.Boogie
           : $"Wrapper_Global_NoninterferenceChecker_{layerNum}";
       wrapperGlobalNoninterferenceCheckerProc = DeclHelper.Procedure(
         civlTypeChecker.AddNamePrefix(wrapperGlobalNoninterferenceCheckerProcName),
-        wrapperNoninterferenceCheckerFormals, new List<Variable>(), new List<Requires>(), new List<Requires>(), new List<Ensures>(), new List<Measure>(), new List<IdentifierExpr>());
+        wrapperNoninterferenceCheckerFormals, new List<Variable>(), new List<Requires>(), new List<Requires>(), new List<Ensures>(), new List<MeasureCmd>(), new List<IdentifierExpr>());
       CivlUtil.AddInlineAttribute(wrapperGlobalNoninterferenceCheckerProc);
 
       if (civlTypeChecker.Options.TrustNoninterference)
@@ -469,12 +469,13 @@ namespace Microsoft.Boogie
           }
         }
 
-        SplitCmds(header.Cmds, out var firstCmds, out var secondCmds);
+        SplitCmds(header.Cmds, out var firstCmds, out var measureCmds, out var secondCmds);
         List<Cmd> newCmds = new List<Cmd>();
         newCmds.AddRange(firstCmds);
         newCmds.AddRange(refinementInstrumentation.CreateAssumeCmds());
         newCmds.AddRange(
           InlineYieldLoopInvariants(yieldingProc.YieldingLoops[absyMap.Original(header)].YieldInvariants));
+        newCmds.AddRange(measureCmds);
         newCmds.AddRange(YieldingLoopDummyAssignment());
         newCmds.AddRange(CreateUpdatesToOldGlobalVars());
         newCmds.AddRange(refinementInstrumentation.CreateUpdatesToOldOutputVars());
@@ -639,7 +640,7 @@ namespace Microsoft.Boogie
         List<Variable> outParams = new List<Variable>();
         List<Requires> requiresSeq = new List<Requires>();
         List<Ensures> ensuresSeq = new List<Ensures>();
-        List<Measure> measureSeq = new List<Measure>();
+        List<MeasureCmd> measureCmdSeq = new List<MeasureCmd>();
         int count = 0;
         foreach (CallCmd callCmd in parCallCmd.CallCmds)
         {
@@ -685,7 +686,7 @@ namespace Microsoft.Boogie
 
         parallelCallAggregators[procName] = DeclHelper.Procedure(
           procName, inParams, outParams, doRefinementCheck ? new List<Requires>() : requiresSeq, new List<Requires>(),
-          ensuresSeq, measureSeq, civlTypeChecker.GlobalVariables.Select(v => Expr.Ident(v)).ToList());
+          ensuresSeq, measureCmdSeq, civlTypeChecker.GlobalVariables.Select(v => Expr.Ident(v)).ToList());
       }
 
       Procedure proc = parallelCallAggregators[procName];
@@ -704,10 +705,11 @@ namespace Microsoft.Boogie
       return civlTypeChecker.Formal($"{count}_{v.Name}", v.TypedIdent.Type, incoming);
     }
 
-    private void SplitCmds(List<Cmd> cmds, out List<Cmd> firstCmds, out List<Cmd> secondCmds)
+    private void SplitCmds(List<Cmd> cmds, out List<Cmd> firstCmds, out List<MeasureCmd> measureCmds,  out List<Cmd> secondCmds)
     {
       firstCmds = new List<Cmd>();
       secondCmds = new List<Cmd>();
+      measureCmds = new List<MeasureCmd>();
       var count = 0;
       bool splitDone = false;
       while (count < cmds.Count)
@@ -721,6 +723,11 @@ namespace Microsoft.Boogie
         else if (cmd is PredicateCmd)
         {
           firstCmds.Add(cmd);
+          count++;
+        }
+        else if (cmd is MeasureCmd mc)
+        {
+          measureCmds.Add(mc);
           count++;
         }
         else
@@ -746,7 +753,7 @@ namespace Microsoft.Boogie
         var requires = action.Gate.Select(a => new Requires(false, a.Expr)).ToList();
         var preserves = new List<Requires>();
         var ensures = new List<Ensures>();
-        var measure = new List<Measure>();
+        var measureCmds = new List<MeasureCmd>();
         var modifies = civlTypeChecker.GlobalVariables.Select(Expr.Ident).ToList();
         var locals = oldGlobalMap.Values.Union(localPermissionCollectors.Values).ToList();
         var cmds = new List<Cmd>();
@@ -759,7 +766,7 @@ namespace Microsoft.Boogie
         var blocks = new List<Block> { BlockHelper.Block("init", cmds) };
 
         var name = civlTypeChecker.AddNamePrefix($"{checkerNamePrefix}_NoninterferenceChecker_{action.Name}_{layerNum}");
-        var proc = DeclHelper.Procedure(name, inputs, outputs, requires, preserves, ensures, measure, modifies);
+        var proc = DeclHelper.Procedure(name, inputs, outputs, requires, preserves, ensures, measureCmds, modifies);
         var impl = DeclHelper.Implementation(proc, inputs, outputs, locals, blocks);
         yield return proc;
         yield return impl;

@@ -451,23 +451,25 @@ namespace Microsoft.Boogie
       return ensuresSeq;
     }
 
-    public virtual Measure VisitMeasure(Measure @measure)
+    public virtual MeasureCmd VisitMeasureCmd(MeasureCmd node)
     {
-      Contract.Requires(@measure != null);
-      Contract.Ensures(Contract.Result<Measure>() != null);
-      @measure.Condition = this.VisitExpr(@measure.Condition);
-      return @measure;
+      Contract.Requires(node != null);
+      Contract.Ensures(Contract.Result<MeasureCmd>() != null);
+      node.Expressions = this.VisitExprSeq(node.Expressions).ToList();
+      VisitAttributes(node);
+      return node;
     }
 
-    public virtual List<Measure> VisitMeasureSeq(List<Measure> measureSeq)
+    public virtual List<MeasureCmd> VisitMeasureCmdSeq(List<MeasureCmd> measureCmdSeq)
     {
-      Contract.Requires(measureSeq != null);
-      Contract.Ensures(Contract.Result<List<Measure>>() != null);
-      for (int i = 0, n = measureSeq.Count; i < n; i++)
+      Contract.Requires(measureCmdSeq != null);
+      Contract.Ensures(Contract.Result<List<MeasureCmd>>() != null);
+      for (int i = 0, n = measureCmdSeq.Count; i < n; i++)
       {
-        measureSeq[i] = this.VisitMeasure(measureSeq[i]);
+        measureCmdSeq[i] = this.VisitMeasureCmd(measureCmdSeq[i]);
       }
-      return measureSeq;
+
+      return measureCmdSeq;
     }
 
     public virtual Expr VisitForallExpr(ForallExpr node)
@@ -680,6 +682,7 @@ namespace Microsoft.Boogie
       node.OutParams = this.VisitVariableSeq(node.OutParams);
       node.Requires = this.VisitRequiresSeq(node.Requires);
       node.Preserves = this.VisitRequiresSeq(node.Preserves);
+      node.MeasureCmds = this.VisitMeasureCmdSeq(node.MeasureCmds);
       VisitAttributes(node);
       return node;
     }
@@ -1344,6 +1347,25 @@ namespace Microsoft.Boogie
 
       return ensuresSeq;
     }
+
+    public override MeasureCmd VisitMeasureCmd(MeasureCmd node)
+    {
+      Contract.Ensures(Contract.Result<Cmd>() == node);
+      this.VisitExprSeq(node.Expressions);
+      return node;
+    }
+
+    public override List<MeasureCmd> VisitMeasureCmdSeq(List<MeasureCmd> measureCmdSeq)
+    {
+      Contract.Ensures(Contract.Result<List<MeasureCmd>>() == measureCmdSeq);
+      for (int i = 0, n = measureCmdSeq.Count; i < n; i++)
+      {
+        this.VisitMeasureCmd(measureCmdSeq[i]);
+      }
+
+      return measureCmdSeq;
+    }
+
 
     public override Expr VisitForallExpr(ForallExpr node)
     {

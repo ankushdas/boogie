@@ -5,9 +5,9 @@ var x: int;
 var y: int;
 var z : int;
 
-procedure two(tid: int, cid: int)
-requires x > 0;
-measure tid + x, cid;
+yield left procedure {:layer 1} two(tid: int, cid: int)
+preserves {:layer 1} x > 0;
+measure {:layer 2} tid + x, cid;
 {
     if (tid <= 1 || cid <=1 )
     {
@@ -19,9 +19,9 @@ measure tid + x, cid;
     }
 }
 
-procedure one(tid: int, cid: int)
-requires x > 0;
-measure tid + x, cid;
+yield left procedure {:layer 1} one(tid: int, cid: int)
+preserves {:layer 1} x > 0;
+measure {:layer 1} tid + x, cid;
 {
     if (tid <= 1 || cid <= 1)
     {
@@ -32,3 +32,4 @@ measure tid + x, cid;
         call two(tid - 1, cid - 1);
     }
 }
+

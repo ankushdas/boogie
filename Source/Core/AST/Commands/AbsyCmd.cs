@@ -2086,6 +2086,108 @@ namespace Microsoft.Boogie
     }
   }
 
+  public class MeasureCmd : Cmd, ICarriesAttributes
+  {
+    public List<Expr> Expressions;
+    public QKeyValue Attributes { get; set; }
+
+    [ContractInvariantMethod]
+    void ObjectInvariant()
+    {
+      Contract.Invariant(Cce.NonNullElements(Expressions));
+    }
+
+    public MeasureCmd(IToken tok, List<Expr> expressions, QKeyValue attributes = null)
+      : base(tok)
+    {
+      Contract.Requires(tok != null);
+      Contract.Requires(Cce.NonNullElements(expressions));
+      Expressions = new List<Expr>(expressions);
+      Attributes = attributes;
+    }
+
+    public MeasureCmd(IToken tok, Expr expression, QKeyValue attributes = null)
+      : base(tok)
+    {
+      Contract.Requires(tok != null);
+      Contract.Requires(expression != null);
+      Expressions = new List<Expr> { expression };
+      Attributes = attributes;
+    }
+
+    public override void Resolve(ResolutionContext rc)
+    {
+      (this as ICarriesAttributes).ResolveAttributes(rc);
+      Layers = (this as ICarriesAttributes).FindLayers();
+
+      if (rc.Proc is YieldProcedureDecl yieldProcedureDecl)
+      {
+        if (Layers == null || Layers.Count == 0)
+        {
+          rc.Error(this, "measure command in a yield procedure must specify at least one layer");
+        }
+        else
+        {
+          foreach (var layer in Layers)
+          {
+            if (layer > yieldProcedureDecl.Layer)
+            {
+              rc.Error(this, $"each layer must not be more than {yieldProcedureDecl.Layer}");
+              break;
+            }
+          }
+        }
+      }
+
+      foreach (var expression in Expressions)
+      {
+        expression.Resolve(rc);
+      }
+    }
+
+    public override void Typecheck(TypecheckingContext tc)
+    {
+      (this as ICarriesAttributes).TypecheckAttributes(tc);
+
+      foreach (var expression in Expressions)
+      {
+        expression.Typecheck(tc);
+        Contract.Assert(expression.Type != null);
+
+        if (!(expression.Type.Equals(Type.Int) || expression.Type.Equals(Type.Bool)))
+        {
+          tc.Error(
+            expression,
+            "a measure expression must be of type int or bool (got: {0})",
+            expression.Type);
+        }
+      }
+    }
+
+    public override void AddAssignedIdentifiers(List<IdentifierExpr> vars)
+    {
+    }
+
+    public override void Emit(TokenTextWriter stream, int level)
+    {
+      stream.Write(this, level, "measure ");
+      EmitAttributes(stream, Attributes);
+      for (int i = 0; i < Expressions.Count; i++)
+      {
+        if (0 < i)
+        {
+          stream.Write(", ");
+        }
+        Expressions[i].Emit(stream);
+      }
+      stream.WriteLine(";");
+    }
+
+    public override Absy StdDispatch(StandardVisitor visitor)
+    {
+      return visitor.VisitMeasureCmd(this);
+    }
+  }
   public class ReturnExprCmd : ReturnCmd
   {
     public Expr Expr;
