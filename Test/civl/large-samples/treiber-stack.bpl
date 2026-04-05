@@ -383,10 +383,9 @@ requires MapIte(treiber->nodes->dom->val, treiber->nodes->val, MapConst(Default(
          MapIte(treiber->nodes->dom->val, treiber'->nodes->val, MapConst(Default()));
 requires Between(treiber->nodes->val, treiber->top, treiber->top, None());
 requires ListInDomain(treiber);
-ensures absStack == AbsDefinition(treiber);
-ensures absStack == AbsDefinition(treiber');
-free ensures absStack == Abs(treiber);
-free ensures absStack == Abs(treiber');
+ensures AbsDefinition(treiber) == AbsDefinition(treiber');
+free ensures Abs(treiber) == AbsDefinition(treiber);
+free ensures Abs(treiber') == AbsDefinition(treiber');
 {
   var loc_n: Option (LocNode X);
   var n: Node X;
