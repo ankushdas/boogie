@@ -309,19 +309,19 @@ pure procedure {:inline 1} Map_MakeEmpty<K,V>() returns ({:linear} m: Map K V)
 pure procedure Map_Get<K,V>({:linear} path: Map K V, {:linear_out} k: K) returns ({:linear} v: V);
 pure procedure Map_Put<K,V>({:linear} path: Map K V, {:linear_in} k: K, {:linear_in} v: V);
 
-type Loc _;
+type Loc;
 
-pure procedure {:inline 1} Loc_New<V>() returns ({:linear} {:pool "Loc_New"} l: One (Loc V))
+pure procedure {:inline 1} Loc_New() returns ({:linear} {:pool "Loc_New"} l: One Loc)
 {
   assume {:add_to_pool "Loc_New", l} true;
 }
 
-datatype TaggedLoc<V,T> { TaggedLoc(loc: Loc V, tag: T) }
+datatype Tag<V> { Tag(loc: Loc, val: V) }
 
-pure procedure {:inline 1} TaggedLocs_New<V,T>(tags: Set T) returns ({:linear} {:pool "Loc_New"} l: One (Loc V), {:linear} tagged_locs: Set (One (TaggedLoc V T)))
+pure procedure {:inline 1} Tags_New<V>(vals: Set V) returns ({:linear} {:pool "Loc_New"} l: One Loc, {:linear} tags: Set (One (Tag V)))
 {
   assume {:add_to_pool "Loc_New", l} true;
-  tagged_locs := Set((lambda x: One (TaggedLoc V T) :: x->val->loc == l->val && Set_Contains(tags, x->val->tag)));
+  tags := Set((lambda x: One (Tag V) :: x->val->loc == l->val && Set_Contains(vals, x->val->val)));
 }
 
 /// Helpers
