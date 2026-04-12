@@ -107,6 +107,7 @@ preserves call StackDom();
   call ReachInStack(loc_t) | StackDom() | PushLocInStack(loc_t, new_top, Node(old_top, x), tag);
   call success := WriteTopOfStack#0(loc_t, old_top, Some(new_top));
   if (success) {
+    assert {:layer 2} Map_Contains(TreiberPool, One(loc_t));
     call {:layer 2} TreiberPool := Copy(Map_Update(TreiberPool, One(loc_t), Vec_Append(Map_At(TreiberPool, One(loc_t)), x)));
     assert {:layer 2} TreiberPoolLow->val[One(loc_t)]->top != None();
     call {:layer 2} AbsLemma(TreiberPoolLow->val[One(loc_t)]);
