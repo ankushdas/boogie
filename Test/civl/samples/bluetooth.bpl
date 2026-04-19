@@ -16,7 +16,7 @@ datatype Perm { Left(i: int), Right(i: int) }
 
 var {:layer 0,3} stoppingFlag: bool;
 var {:layer 0,2} stopped: bool;
-var {:layer 1,2} {:linear} usersInDriver: Set (One Perm);
+var {:layer 1,2} {:linear} usersInDriver: UnitMap (One Perm);
 var {:layer 0,1} pendingIo: int;
 var {:layer 0,1} stoppingEvent: bool;
 
@@ -24,18 +24,18 @@ yield invariant {:layer 2} Inv2();
 preserves stopped ==> stoppingFlag;
 
 yield invariant {:layer 1} Inv1();
-preserves stoppingEvent ==> stoppingFlag && usersInDriver->val == MapConst(false);
-preserves pendingIo == Set_Size(usersInDriver) + (if stoppingFlag then 0 else 1);
+preserves stoppingEvent ==> stoppingFlag && usersInDriver->dom == MapConst(false);
+preserves pendingIo == Set_Size(usersInDriver->dom) + (if stoppingFlag then 0 else 1);
 
-function {:inline} Split(i: int, l: Set (One Perm), r: Set (One Perm)): bool
+function {:inline} Split(i: int, l: UnitMap (One Perm), r: UnitMap (One Perm)): bool
 {
-    l == Set_Singleton(One(Left(i))) && r == Set_Singleton(One(Right(i)))
+    l->dom == Set_Singleton(One(Left(i))) && r->dom == Set_Singleton(One(Right(i)))
 }
 
 // user code
 
 yield procedure {:layer 2}
-User(i: int, {:layer 1,2} {:linear} l: Set (One Perm), {:linear} {:layer 1,2} r: Set (One Perm))
+User(i: int, {:layer 1,2} {:linear} l: UnitMap (One Perm), {:linear} {:layer 1,2} r: UnitMap (One Perm))
 preserves call Inv2();
 preserves call Inv1();
 requires {:layer 1, 2} Split(i, l, r);
@@ -51,14 +51,14 @@ requires {:layer 1, 2} Split(i, l, r);
     }
 }
 
-atomic action {:layer 2} AtomicEnter#1(i: int, {:linear_in} l: Set (One Perm), {:linear} r: Set (One Perm))
+atomic action {:layer 2} AtomicEnter#1(i: int, {:linear_in} l: UnitMap (One Perm), {:linear} r: UnitMap (One Perm))
 modifies usersInDriver;
 {
     assume !stoppingFlag;
-    call Set_Put(usersInDriver, l);
+    call Map_Join(usersInDriver, l);
 }
 yield procedure {:layer 1}
-Enter#1(i: int, {:layer 1} {:linear_in} l: Set (One Perm), {:layer 1} {:linear} r: Set (One Perm))
+Enter#1(i: int, {:layer 1} {:linear_in} l: UnitMap (One Perm), {:layer 1} {:linear} r: UnitMap (One Perm))
 refines AtomicEnter#1;
 preserves call Inv1();
 requires {:layer 1} Split(i, l, r);
@@ -67,49 +67,54 @@ requires {:layer 1} Split(i, l, r);
     call {:layer 1} usersInDriver := A(usersInDriver, l);
 }
 
-pure action A({:linear_in} usersInDriver: Set (One Perm), {:linear_in} l: Set (One Perm))
-  returns ({:linear} usersInDriver': Set (One Perm))
+pure action A({:linear_in} usersInDriver: UnitMap (One Perm), {:linear_in} l: UnitMap (One Perm))
+  returns ({:linear} usersInDriver': UnitMap (One Perm))
 {
     usersInDriver' := usersInDriver;
-    call Set_Put(usersInDriver', l);
+    call Map_Join(usersInDriver', l);
 }
 
-left action {:layer 2} AtomicCheckAssert#1(i: int, {:linear} r: Set (One Perm))
+left action {:layer 2} AtomicCheckAssert#1(i: int, {:linear} r: UnitMap (One Perm))
 {
-    assert r == Set_Singleton(One(Right(i))) && Set_Contains(usersInDriver, One(Left(i)));
+    assert r->dom == Set_Singleton(One(Right(i))) && Map_Contains(usersInDriver, One(Left(i)));
     assert !stopped;
 }
 yield procedure {:layer 1}
-CheckAssert#1(i: int, {:layer 1} {:linear} r: Set (One Perm))
+CheckAssert#1(i: int, {:layer 1} {:linear} r: UnitMap (One Perm))
 refines AtomicCheckAssert#1;
 preserves call Inv1();
 {
     call CheckAssert();
 }
 
-left action {:layer 2} AtomicExit(i: int, {:linear_out} l: Set (One Perm), {:linear} r: Set (One Perm))
+left action {:layer 2} AtomicExit(i: int, {:linear_out} l: UnitMap (One Perm), {:linear} r: UnitMap (One Perm))
 modifies usersInDriver;
 {
+    var _l: UnitMap (One Perm);
     assert Split(i, l, r);
-    call Set_Get(usersInDriver, l);
+    call _l := Map_Split(usersInDriver, l->dom);
+    call Move(_l, l);
+
 }
 yield procedure {:layer 1}
-Exit(i: int, {:layer 1} {:linear_out} l: Set (One Perm), {:layer 1} {:linear} r: Set (One Perm))
+Exit(i: int, {:layer 1} {:linear_out} l: UnitMap (One Perm), {:layer 1} {:linear} r: UnitMap (One Perm))
 refines AtomicExit;
 requires {:layer 1} Split(i, l, r);
 preserves call Inv1();
 {
     call DeleteReference();
     call {:layer 1} usersInDriver := B(usersInDriver, l);
-    call {:layer 1} Lemma_SetSize_Subset(Set_Empty(), usersInDriver);
+    call {:layer 1} Lemma_SetSize_Subset(Set_Empty(), usersInDriver->dom);
 }
 
-pure action B({:linear_in} usersInDriver: Set (One Perm), {:linear_out} l: Set (One Perm))
-  returns ({:linear} usersInDriver': Set (One Perm))
+pure action B({:linear_in} usersInDriver: UnitMap (One Perm), {:linear_out} l: UnitMap (One Perm))
+  returns ({:linear} usersInDriver': UnitMap (One Perm))
 {
-    assert Set_IsSubset(l, usersInDriver);
+    var _l: UnitMap (One Perm);
+    assert Set_IsSubset(l->dom, usersInDriver->dom);
     usersInDriver' := usersInDriver;
-    call Set_Get(usersInDriver', l);
+    call _l := Map_Split(usersInDriver', l->dom);
+    call Move(_l, l);
 }
 
 // stopper code
@@ -129,13 +134,13 @@ preserves call Inv1();
 {
     call SetStoppingFlag(i);
     call DeleteReference();
-    call {:layer 1} Lemma_SetSize_Subset(Set_Empty(), usersInDriver);
+    call {:layer 1} Lemma_SetSize_Subset(Set_Empty(), usersInDriver->dom);
 }
 
 atomic action {:layer 2} AtomicWaitAndStop()
 modifies stopped;
 {
-    assume usersInDriver->val == MapConst(false);
+    assume usersInDriver->dom == MapConst(false);
     stopped := true;
 }
 yield procedure {:layer 1} WaitAndStop()

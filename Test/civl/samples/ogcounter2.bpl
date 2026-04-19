@@ -8,11 +8,11 @@ const unique Nil: X;
 var {:layer 2,5} x: int;
 var {:layer 2,3} lock: X;
 
-var {:layer 1,4}{:linear} unallocated: Set (One X);
+var {:layer 1,4}{:linear} unallocated: UnitMap (One X);
 
 right action {:layer 2,4} AtomicAllocTid() returns ({:linear} tid: One X)
 modifies unallocated;
-{ assume tid->val != Nil && Set_Contains(unallocated, tid); call One_Get(unallocated, tid); }
+{ assume tid->val != Nil && Map_Contains(unallocated, tid); call One_Get(unallocated, tid); }
 
 yield procedure {:layer 1} AllocTid() returns ({:linear} tid: One X);
 refines AtomicAllocTid;
